@@ -15,7 +15,10 @@ class Individual:
         self.code = []
         if firstInit:
             self.initialize()
-
+            
+    def __lt__(self, other):
+         return self.fitness() < other.fitness()
+         
     def fitness(self):
         sse_distances = 0.0
         for i in range(len(self.labels)):
@@ -25,6 +28,7 @@ class Individual:
 
     def initialize(self):
         self.code = random.sample(self.points, k = self.num_clasters)
+        
     
     def precomputeDistances(self):
         # print(f"Pocetni centroidi: {self.code}")
@@ -36,13 +40,16 @@ class Individual:
                     min = j
             labels.append(min)
             self.labels = labels
-       
+            
+        
         clusters = dict()
         for i in range(0, self.num_clasters):
             clusters[i] = []
-
+            
+        
         for i in range(len(labels)): 
             clusters[labels[i]].append(self.points[i])
+            
 
         for i in range(0,self.num_clasters):
             self.code[i] =  np.sum(clusters[i], axis=0)  / len(clusters[i])
@@ -52,39 +59,44 @@ class Individual:
 def selection(population):
     lengthOfPopulation = len(population)
 
-    calcFitness = np.zeros(lengthOfPopulation)
+
+    calcFitness = []
     sumOfFitness = 0
-   # probabilities = np.zeros(lengthOfPopulation)
+    probabilities = []
 
     for i in range(lengthOfPopulation):
-        calcFitness[i] = population[i].fitness()
+        calcFitness.append(population[i].fitness())
         sumOfFitness += calcFitness[i]
+        
+    for i in range(lengthOfPopulation):
+        probabilities.append(calcFitness[i] / sumOfFitness)
+        
+        
 
-    #for i in range(lengthOfPopulation):
-    #    probabilities[i] = calcFitness[i] / sumOfFitness
-    #    print(probabilities[i], i)
-
-    indexes = sorted(list(zip(range(lengthOfPopulation), calcFitness)), key=lambda x: x[1])
+    indexes = list(zip(range(lengthOfPopulation), np.cumsum(probabilities)))
     #print(indexes)
     k = 0
+    
     prob = random.random()
+    
     #print(prob)
     for j in range(0, lengthOfPopulation):
 
-        if indexes[j][1] > prob:
+        if indexes[j][1] > prob or indexes[j][1] == prob :
             break
-
-        #print(j)
-        k = indexes[j][0]
-        #print(k)
-
+        
+        
+    #print(j)
+    k = indexes[j][0]
+    #print(population[k].code)
+    #print(k)
+    
     return k
 
-def crossover(parent1, parent2):
+def crossover(parent1, parent2, child1, child2):
     chromosomeLength = len(parent1.code)
-
-    child1 = parent1
-    child2 = parent2
+    
+    
 
     i = random.randrange(chromosomeLength)
 
@@ -96,54 +108,81 @@ def crossover(parent1, parent2):
         child1.code[j] = parent2.code[j]
         child2.code[j] = parent1.code[j]
 
-    return child1, child2
 
 
-def mutation(individual, number):
-    chromosomeLength = len(individual.code)
-    gene = len(individual.code[0])
+def mutation(individual, mutation_rate):
+
+    individualLength = len(individual)
+    
+
+    gene = len(individual[0])
+    
     sign = -1
     if (random.random() < 0.5):
         sign = 1
 
-    for i in range(chromosomeLength):
+    for i in range(individualLength):
         r = random.random()
-        print(r)
-        if r > number:
+        
+        if r > mutation_rate:
             continue
         delta = random.uniform(0, 1)
         for j in range(gene):
-            if (individual.code[i][j] == 0):
-                individual.code[i][j] = sign * 2 * delta
-        individual.code[i][j] += sign * 2 * delta * individual.code[i][j]
+            if (individual[i][j] == 0):
+                individual[i][j] = individual[i][j] + sign * 2 * delta
+            else:
+            	individual[i][j] = individual[i][j] + sign * 2 * delta * individual[i][j]
+    
 
-    return individual
 
 
 
 def genethic_algorithm(num_clasters, points, mutation_rate, pop_size, max_iter, elitism_size):
     #kreiranje inicijalne populacije
     population = [Individual(num_clasters,points, mutation_rate,firstInit=True) for _ in range(pop_size)]
-    newPopulation = [Individual(num_clasters, points, mutation_rate, firstInit=True) for _ in range(pop_size)]
+    
+    newPopulation = [Individual(num_clasters,points, mutation_rate,firstInit=True) for _ in range(pop_size)]
     #izracunavanje fitnesa za svaku jedinku -> neophodno je da isklasterujem tacke i kreiram nove centroide
+
     for individual in population:
         individual.precomputeDistances()
-        # print(individual.fitness())
-
-    for i in range(pop_size):
-        newPopulation[i] = population[i]
+       
 
     for i in range(max_iter):
-        for j in range(pop_size-1):
+        population.sort()
+        
+        
+        for i in range(elitism_size):
+            newPopulation[i] = population[i]
+            
+        for i in range(elitism_size, pop_size, 2):
+            
             k1 = selection(population)
             k2 = selection(population)
-            newPopulation[j], newPopulation[j+1] = crossover(population[k1], population[k2])
-            #mutation(newPopulation[j], mutation_rate)
-        # mutacija...
-        # elitizam...
-        # smena generacija...
-
+            
+            
+            #print('pp')
+            #print(population[k1].code)
+            #print(population[k2].code)
+            
+            crossover(population[k1], population[k2], newPopulation[i], newPopulation[i + 1])
+            #print('new')
+            #print(newPopulation[i].code)
+            #print(newPopulation[i+1].code)
+            
+            #mutation(newPopulation[i].code, mutation_rate)
+            #mutation(newPopulation[i+1].code, mutation_rate)
+            
+            newPopulation[i].precomputeDistances()
+            newPopulation[i+1].precomputeDistances()
+            
+    
+        
         population = newPopulation
-        #elitizam...
+        
+
         #smena generacija...
+    population.sort()
+    
+    
     return population[0]
