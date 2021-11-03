@@ -9,7 +9,7 @@ class GACluster:
         self.mutation_rate_ = mutation_rate
         self.elitism_size_ = elitism_size
         self.cluster_centers_ = np.ndarray(0)
-        self.labels_ = np.ndarray(0)
+        self.labels_ = np.array([])
         self.sse_ = float('inf')
     
     # cluster_centers_ :ndarray of shape (n_clusters, n_features)

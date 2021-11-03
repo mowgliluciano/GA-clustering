@@ -24,14 +24,14 @@ class Individual:
         for i in range(len(self.labels)):
             # print(tacke[i], self.code[self.labels[i]], euclidean_distances(self.code[self.labels[i]],tacke[i]))
             sse_distances += euclidean_distances(self.code[self.labels[i]],self.points[i])
+        # sse_distances = sum([ euclidean_distances(self.code[self.labels[i]],self.points[i]) for i in range(len(self.labels))])
         return sse_distances
 
     def initialize(self):
         self.code = random.sample(self.points, k = self.num_clasters)
         
-    
     def precomputeDistances(self):
-        # print(f"Pocetni centroidi: {self.code}")
+        print(f"Pocetni centroidi: {self.code}")
         labels = []
         for i in range(len(self.points)):
             min = 0
@@ -39,39 +39,42 @@ class Individual:
                 if euclidean_distances(self.points[i], self.code[j]) < euclidean_distances(self.points[i], self.code[min]):
                     min = j
             labels.append(min)
-            self.labels = labels
-            
-        
-        clusters = dict()
+        self.labels = labels
+
+        clusters = dict() # 0 -> []
+        print ('Labels :', labels)
         for i in range(0, self.num_clasters):
-            clusters[i] = []
-            
-        
+            clusters[i] = [] 
+                    
         for i in range(len(labels)): 
             clusters[labels[i]].append(self.points[i])
-            
 
-        for i in range(0,self.num_clasters):
+        for i in range(self.num_clasters):
+            print(i, clusters[i],len(clusters[i]))
             self.code[i] =  np.sum(clusters[i], axis=0)  / len(clusters[i])
+            print('Code', self.code[i])
             # print(f"Klaster {i} : {nove_centroide[i]}, suma = {suma}, novi centar = { suma / len(nove_centroide[i])}")
             
-            
+#Neka bude ruletska za sad
 def selection(population):
     lengthOfPopulation = len(population)
+    # calcFitness = []
+    # sumOfFitness = 0
+    # probabilities = []
 
+    # for i in range(lengthOfPopulation):
+    #     calcFitness.append(population[i].fitness())
+    #     sumOfFitness += calcFitness[i]
 
-    calcFitness = []
-    sumOfFitness = 0
-    probabilities = []
+    # for i in range(lengthOfPopulation):
+    #     probabilities.append(calcFitness[i] / sumOfFitness)
 
-    for i in range(lengthOfPopulation):
-        calcFitness.append(population[i].fitness())
-        sumOfFitness += calcFitness[i]
-        
-    for i in range(lengthOfPopulation):
-        probabilities.append(calcFitness[i] / sumOfFitness)
-        
-        
+    #krace 
+    calcFitness = [population[i].fitness() for i  in range(lengthOfPopulation)]
+    sumOfFitness = sum(calcFitness)
+    # sumOfFitness = sum(map(lambda ind: ind.fitess(), population))
+    probabilities = [population[i].fitness() / sumOfFitness  for i in range(lengthOfPopulation)]        
+    
 
     indexes = list(zip(range(lengthOfPopulation), np.cumsum(probabilities)))
     #print(indexes)
@@ -81,10 +84,8 @@ def selection(population):
     
     #print(prob)
     for j in range(0, lengthOfPopulation):
-
         if indexes[j][1] > prob or indexes[j][1] == prob :
             break
-        
         
     #print(j)
     k = indexes[j][0]
@@ -95,25 +96,26 @@ def selection(population):
 
 def crossover(parent1, parent2, child1, child2):
     chromosomeLength = len(parent1.code)
-    
-    
-
+  
     i = random.randrange(chromosomeLength)
 
-    for j in range(i):
-        child1.code[j] = parent1.code[j]
-        child2.code[j] = parent2.code[j]
+    # for j in range(i):
+    #     child1.code[j] = parent1.code[j]
+    #     child2.code[j] = parent2.code[j]
+   
+    #krace:
+    child1.code[:i], child2.code[:i] = parent1.code[:i], parent2.code[:i]
 
-    for j in range(i, chromosomeLength):
-        child1.code[j] = parent2.code[j]
-        child2.code[j] = parent1.code[j]
-
+    # for j in range(i, chromosomeLength):
+    #     child1.code[j] = parent2.code[j]
+    #     child2.code[j] = parent1.code[j]
+   
+    child1.code[i:], child2.code[i:] = parent2.code[i:], parent1.code[i:]
 
 
 def mutation(individual, mutation_rate):
 
     individualLength = len(individual)
-    
 
     gene = len(individual[0])
     
@@ -122,7 +124,7 @@ def mutation(individual, mutation_rate):
         sign = 1
 
     for i in range(individualLength):
-        r = random.random()
+        r = random.random()  
         
         if r > mutation_rate:
             continue
@@ -132,10 +134,6 @@ def mutation(individual, mutation_rate):
                 individual[i][j] = individual[i][j] + sign * 2 * delta
             else:
             	individual[i][j] = individual[i][j] + sign * 2 * delta * individual[i][j]
-    
-
-
-
 
 def genethic_algorithm(num_clasters, points, mutation_rate, pop_size, max_iter, elitism_size):
     #kreiranje inicijalne populacije
@@ -175,14 +173,10 @@ def genethic_algorithm(num_clasters, points, mutation_rate, pop_size, max_iter, 
             
             newPopulation[i].precomputeDistances()
             newPopulation[i+1].precomputeDistances()
-            
-    
         
         population = newPopulation
         
 
-        #smena generacija...
     population.sort()
-    
-    
+        
     return population[0]
