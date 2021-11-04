@@ -6,6 +6,25 @@ def euclidean_distances(X, Y):
     X_Y = np.subtract(X,Y) # X - Y
     return norm(X_Y)
 
+
+#Provera da li postoji prazan klaster
+#Ako postoji vraca index praznog klastera
+def exitsts_empty_cluster(clusters):
+    try:
+        index_of_empt = list(clusters.values()).index([])
+        return index_of_empt        
+    except ValueError:
+        return -1
+
+
+#Funkcija za preracunavanje centroida
+def compute_centroids(code, clusters, num_clasters):
+    for i in range(num_clasters):
+                print(i, clusters[i],len(clusters[i]))
+                code[i] =  np.sum(clusters[i], axis=0)  / len(clusters[i])
+                print('Code', code[i])
+                # print(f"Klaster {i} : {nove_centroide[i]}, suma = {suma}, novi centar = { suma / len(nove_centroide[i])}")
+            
 class Individual:
     def __init__(self, num_clasters, points, mutation_rate, firstInit = True):
         self.num_clasters = num_clasters
@@ -29,9 +48,9 @@ class Individual:
 
     def initialize(self):
         self.code = random.sample(self.points, k = self.num_clasters)
-        
+    
     def precomputeDistances(self):
-        print(f"Pocetni centroidi: {self.code}")
+#        print(f"Pocetni centroidi: {self.code}")
         labels = []
         for i in range(len(self.points)):
             min = 0
@@ -42,18 +61,36 @@ class Individual:
         self.labels = labels
 
         clusters = dict() # 0 -> []
-        print ('Labels :', labels)
+        # print ('Labels :', labels)
         for i in range(0, self.num_clasters):
             clusters[i] = [] 
                     
         for i in range(len(labels)): 
             clusters[labels[i]].append(self.points[i])
 
-        for i in range(self.num_clasters):
-            print(i, clusters[i],len(clusters[i]))
-            self.code[i] =  np.sum(clusters[i], axis=0)  / len(clusters[i])
-            print('Code', self.code[i])
-            # print(f"Klaster {i} : {nove_centroide[i]}, suma = {suma}, novi centar = { suma / len(nove_centroide[i])}")
+        #Azuriranje centroida
+        compute_centroids(code=self.code, clusters=clusters, num_clasters=self.num_clasters)
+        
+        #Ovde proveravam ako je klaster przan ...
+        empty_index  = exitsts_empty_cluster(clusters)
+        while empty_index !=-1:
+            print("\n\n------PRAZAN KLASTER--------:  ", empty_index)            
+            #Uzmi random tacku i prebaci je iz njenoh klastera u prazan klaster
+            p_index = random.randrange(len(self.points))
+            clusters[empty_index].append(self.points[p_index])
+           
+            #Azuriraj labelu
+            prev_cluster = labels[p_index]
+            labels[p_index] = empty_index
+
+            #Izbaci ovu tacku iz prethodnog klastera
+            clusters[prev_cluster].remove(self.points[p_index])
+
+            #Ponovo azuriraj centroide
+            compute_centroids(code=self.code, clusters=clusters, num_clasters=self.num_clasters)
+
+            #Ponovo proveri ima li praznih klastera
+            empty_index = exitsts_empty_cluster(clusters)
             
 #Neka bude ruletska za sad
 def selection(population):
@@ -96,7 +133,6 @@ def selection(population):
 
 def crossover(parent1, parent2, child1, child2):
     chromosomeLength = len(parent1.code)
-  
     i = random.randrange(chromosomeLength)
 
     # for j in range(i):
