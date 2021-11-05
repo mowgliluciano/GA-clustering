@@ -1,10 +1,17 @@
 import numpy as np
+from scipy.spatial import distance
 import random
-from numpy.linalg import norm
+import numpy.linalg as LA
+import matplotlib.pyplot as plt
+
 
 def euclidean_distances(X, Y):
     X_Y = np.subtract(X,Y) # X - Y
-    return norm(X_Y)
+    
+    return LA.norm(X_Y)
+
+def manhattan_distances(X, Y):
+    return sum(abs(val1-val2) for val1, val2 in zip(X, Y))
 
 
 #Provera da li postoji prazan klaster
@@ -26,10 +33,11 @@ def compute_centroids(code, clusters, num_clasters):
                 # print(f"Klaster {i} : {nove_centroide[i]}, suma = {suma}, novi centar = { suma / len(nove_centroide[i])}")
             
 class Individual:
-    def __init__(self, num_clasters, points, mutation_rate, firstInit = True):
+    def __init__(self, num_clasters, points, mutation_rate, distance, firstInit = True):
         self.num_clasters = num_clasters
         self.points = points
         self.mutation_rate = mutation_rate
+        self.distance = distance
         self.labels = []
         self.code = []
         if firstInit:
@@ -39,10 +47,16 @@ class Individual:
          return self.fitness() < other.fitness()
          
     def fitness(self):
+        
         sse_distances = 0.0
         for i in range(len(self.labels)):
             # print(tacke[i], self.code[self.labels[i]], euclidean_distances(self.code[self.labels[i]],tacke[i]))
-            sse_distances += euclidean_distances(self.code[self.labels[i]],self.points[i])
+            if self.distance == "euclidean":
+                sse_distances += euclidean_distances(self.code[self.labels[i]],self.points[i])
+            elif self.distance == "manhattan":
+                sse_distances += manhattan_distances(self.code[self.labels[i]],self.points[i])
+            else:
+                raise ValueError('Distance must be euclidean or manhattan.')
         # sse_distances = sum([ euclidean_distances(self.code[self.labels[i]],self.points[i]) for i in range(len(self.labels))])
         return sse_distances
 
@@ -55,8 +69,14 @@ class Individual:
         for i in range(len(self.points)):
             min = 0
             for j in range(1, self.num_clasters):
-                if euclidean_distances(self.points[i], self.code[j]) < euclidean_distances(self.points[i], self.code[min]):
-                    min = j
+                if self.distance == "euclidean":
+                    if euclidean_distances(self.points[i], self.code[j]) < euclidean_distances(self.points[i], self.code[min]):
+                        min = j
+                elif self.distance == "manhattan":
+                    if manhattan_distances(self.points[i], self.code[j]) < manhattan_distances(self.points[i], self.code[min]):
+                        min = j
+                else:
+                    raise ValueError('Distance must be euclidean or manhattan.')
             labels.append(min)
         self.labels = labels
 
@@ -91,43 +111,57 @@ class Individual:
 
             #Ponovo proveri ima li praznih klastera
             empty_index = exitsts_empty_cluster(clusters)
-            
-#Neka bude ruletska za sad
-def selection(population):
-    lengthOfPopulation = len(population)
-    # calcFitness = []
-    # sumOfFitness = 0
-    # probabilities = []
 
-    # for i in range(lengthOfPopulation):
-    #     calcFitness.append(population[i].fitness())
-    #     sumOfFitness += calcFitness[i]
+def selection(population, category='roulette', TOURNAMENT_SIZE=2):
+    
+    if category == 'roulette':
+        lengthOfPopulation = len(population)
+        # calcFitness = []
+        # sumOfFitness = 0
+        # probabilities = []
 
-    # for i in range(lengthOfPopulation):
-    #     probabilities.append(calcFitness[i] / sumOfFitness)
+        # for i in range(lengthOfPopulation):
+        #     calcFitness.append(population[i].fitness())
+        #     sumOfFitness += calcFitness[i]
 
-    #krace 
-    calcFitness = [population[i].fitness() for i  in range(lengthOfPopulation)]
-    sumOfFitness = sum(calcFitness)
-    # sumOfFitness = sum(map(lambda ind: ind.fitess(), population))
-    probabilities = [population[i].fitness() / sumOfFitness  for i in range(lengthOfPopulation)]        
+        # for i in range(lengthOfPopulation):
+        #     probabilities.append(calcFitness[i] / sumOfFitness)
+
+        #krace 
+        calcFitness = [population[i].fitness() for i  in range(lengthOfPopulation)]
+        sumOfFitness = sum(calcFitness)
+        # sumOfFitness = sum(map(lambda ind: ind.fitess(), population))
+        probabilities = [population[i].fitness() / sumOfFitness  for i in range(lengthOfPopulation)]        
     
 
-    indexes = list(zip(range(lengthOfPopulation), np.cumsum(probabilities)))
-    #print(indexes)
-    k = 0
+        indexes = list(zip(range(lengthOfPopulation), np.cumsum(probabilities)))
+        k = 0
     
-    prob = random.random()
+        prob = random.random()
     
-    #print(prob)
-    for j in range(0, lengthOfPopulation):
-        if indexes[j][1] > prob or indexes[j][1] == prob :
-            break
+        #print(prob)
+        for j in range(0, lengthOfPopulation):
+            if indexes[j][1] > prob or indexes[j][1] == prob :
+                break
         
-    #print(j)
-    k = indexes[j][0]
-    #print(population[k].code)
-    #print(k)
+        #print(j)
+        k = indexes[j][0]
+        
+    elif category == 'tournament':
+        
+        bestFitness = float('inf')
+        k = -1
+    
+        for i in range(TOURNAMENT_SIZE):
+            index = random.randrange(len(population))
+            if population[index].fitness() < bestFitness:
+                bestFitness = population[index].fitness()
+                k = index
+    else:
+        raise ValueError('Category must be tournament or roulette')
+        
+        
+        
     
     return k
 
@@ -171,48 +205,74 @@ def mutation(individual, mutation_rate):
             else:
             	individual[i][j] = individual[i][j] + sign * 2 * delta * individual[i][j]
 
-def genethic_algorithm(num_clasters, points, mutation_rate, pop_size, max_iter, elitism_size):
+def genethic_algorithm(num_clasters, points, mutation_rate, pop_size, category, distance,  max_iter, elitism_size):
     #kreiranje inicijalne populacije
-    population = [Individual(num_clasters,points, mutation_rate,firstInit=True) for _ in range(pop_size)]
+    population = [Individual(num_clasters,points, mutation_rate,distance, firstInit=True) for _ in range(pop_size)]
     
-    newPopulation = [Individual(num_clasters,points, mutation_rate,firstInit=True) for _ in range(pop_size)]
+    newPopulation = [Individual(num_clasters,points, mutation_rate, distance, firstInit=True) for _ in range(pop_size)]
     #izracunavanje fitnesa za svaku jedinku -> neophodno je da isklasterujem tacke i kreiram nove centroide
 
     for individual in population:
         individual.precomputeDistances()
-       
-
-    for i in range(max_iter):
-        population.sort()
         
+    plt_ind = 1
+    fig = plt.figure(figsize=(20, 20))
+       
+    colors = ['red', 'blue', 'gold',  'green', 'plum', 'orange', 'magenta']
+    
+    if max_iter > 20:
+        step =  20
+    else:
+        step =  5
+        
+    n = max_iter / step + 1
+        
+    
+    for k in range(max_iter):
+        
+        if k % 10 == 0 or k+1 == max_iter:
+            
+            fig.add_subplot(n, 2, plt_ind)
+            labels  = population[0].labels
+            
+            for j in range(len(population[0].points)):
+                plt.scatter(population[0].points[j][0], population[0].points[j][1], c=colors[labels[j]])
+            
+
+            #postavljanje naslova za svaku celiju
+            plt.title("iteration: %d     inertia: %d   %s  %s"  % (k+1, population[0].fitness(), distance, category), fontsize=10)
+
+            #prelazak u narednu celiju 
+            plt_ind+=1
+            
+
+        population.sort()  
         
         for i in range(elitism_size):
             newPopulation[i] = population[i]
             
         for i in range(elitism_size, pop_size, 2):
             
-            k1 = selection(population)
-            k2 = selection(population)
+            k1 = selection(population, category)
+            k2 = selection(population, category)
             
-            
-            #print('pp')
-            #print(population[k1].code)
-            #print(population[k2].code)
             
             crossover(population[k1], population[k2], newPopulation[i], newPopulation[i + 1])
-            #print('new')
-            #print(newPopulation[i].code)
-            #print(newPopulation[i+1].code)
+
             
-            #mutation(newPopulation[i].code, mutation_rate)
-            #mutation(newPopulation[i+1].code, mutation_rate)
+            mutation(newPopulation[i].code, mutation_rate)
+            mutation(newPopulation[i+1].code, mutation_rate)
             
             newPopulation[i].precomputeDistances()
             newPopulation[i+1].precomputeDistances()
         
         population = newPopulation
         
+        
 
     population.sort()
+    
+    plt.tight_layout()
+    plt.show()
         
     return population[0]
