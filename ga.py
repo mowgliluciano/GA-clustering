@@ -192,18 +192,20 @@ def mutation(individual, mutation_rate):
     sign = -1
     if (random.random() < 0.5):
         sign = 1
-
-    for i in range(individualLength):
-        r = random.random()  
         
-        if r > mutation_rate:
-            continue
-        delta = random.uniform(0, 1)
-        for j in range(gene):
-            if (individual[i][j] == 0):
-                individual[i][j] = individual[i][j] + sign * 2 * delta
-            else:
-            	individual[i][j] = individual[i][j] + sign * 2 * delta * individual[i][j]
+    r = random.random()  
+        
+    if r > mutation_rate:
+        return
+
+    randomCentroid = random.randrange(individualLength)
+        
+    delta = random.uniform(0, 1)
+    for j in range(gene):
+        if (individual[randomCentroid][j] == 0):
+            individual[randomCentroid][j] = individual[randomCentroid][j] + sign * 2 * delta
+        else:
+            individual[randomCentroid][j] = individual[randomCentroid][j] + sign * 2 * delta * individual[randomCentroid][j]
 
 def genethic_algorithm(num_clasters, points, mutation_rate, pop_size, category, distance,  max_iter, elitism_size):
     #kreiranje inicijalne populacije
@@ -218,7 +220,7 @@ def genethic_algorithm(num_clasters, points, mutation_rate, pop_size, category, 
     plt_ind = 1
     fig = plt.figure(figsize=(20, 20))
        
-    colors = ['red', 'blue', 'gold',  'green', 'plum', 'orange', 'magenta']
+    colors = np.array(['red', 'blue', 'gold',  'green', 'plum', 'orange', 'magenta'])
     
     if max_iter > 20:
         step =  20
@@ -229,24 +231,27 @@ def genethic_algorithm(num_clasters, points, mutation_rate, pop_size, category, 
         
     
     for k in range(max_iter):
-        
-        if k % 10 == 0 or k+1 == max_iter:
+        population.sort()
+        if (k+1) % 10 == 0 or k+1 == max_iter:
             
             fig.add_subplot(n, 2, plt_ind)
+            
             labels  = population[0].labels
+            centres = population[0].code
             
-            for j in range(len(population[0].points)):
-                plt.scatter(population[0].points[j][0], population[0].points[j][1], c=colors[labels[j]])
             
+            plt.scatter(x=list(map(lambda point: point[0],population[0].points)), y=list(map(lambda point: point[1],population[0].points)), c=colors[labels])
+            
+            plt.scatter(x=list(map(lambda centre: centre[0], centres)), y=list(map(lambda centre: centre[1], centres)), c=['black'], marker='s')
 
             #postavljanje naslova za svaku celiju
-            plt.title("iteration: %d     inertia: %d   %s  %s"  % (k+1, population[0].fitness(), distance, category), fontsize=10)
+            plt.title("iteration: %d     inertia: %d   %s  %s"  % (k, population[0].fitness(), distance, category), fontsize=10)
 
             #prelazak u narednu celiju 
             plt_ind+=1
             
 
-        population.sort()  
+          
         
         for i in range(elitism_size):
             newPopulation[i] = population[i]
