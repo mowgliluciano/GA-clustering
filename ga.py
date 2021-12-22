@@ -1,37 +1,29 @@
 import numpy as np
-# from scipy.spatial import distance
 import random
 import matplotlib.pyplot as plt
 
 
 def ss_dist(X, Y):
-    X_Y = np.subtract(X,Y) # X - Y
-    return np.sum(X_Y**2)
+    return np.sum(np.subtract(X,Y)**2)
 
 def manhattan_distances(X, Y):
     return sum(abs(val1-val2) for val1, val2 in zip(X, Y))
 
-
-#Provera da li postoji prazan klaster
-#Ako postoji vraca index praznog klastera
+# Funkcija koja vraca indeks praznog klastera
 def exitsts_empty_cluster(clusters):
     try:
         index_of_empt = clusters.index([])
         return index_of_empt        
     except ValueError:
         return -1
-
-
-#Funkcija za preracunavanje centroida
+        
+# Funkcija za preracunavanje centroida
 def compute_centroids(code, clusters, num_clasters, points):
     for i in range(num_clasters):
-                # print(i, clusters[i],len(clusters[i]),points)
-                code[i] =  np.sum(points[clusters[i]], axis=0)  / len(clusters[i])
-                # print('Code', code[i])
-                # print(f"Klaster {i} : {nove_centroide[i]}, suma = {suma}, novi centar = { suma / len(nove_centroide[i])}")
+        code[i] =  np.sum(points[clusters[i]], axis=0)  / len(clusters[i])
     
     
-#Funkcija koja iscrtava klasterovanje najbolje jedinke      
+# Funkcija koja iscrtava klasterovanje najbolje jedinke      
 def plot_best_individual(currBestIndividual, k, category, distance):
     colors = np.array(['red', 'blue', 'gold',  'green', 'plum', 'orange', 'magenta'])
     #Iscrtavanje tacaka
@@ -39,16 +31,45 @@ def plot_best_individual(currBestIndividual, k, category, distance):
                 y=currBestIndividual.points[ : , 1],
                 c=colors[currBestIndividual.labels])
     
-    #Iscrtavanje centara
-    plt.scatter(x=list(map(lambda centre: centre[0], currBestIndividual.code)),
-                y=list(map(lambda centre: centre[1], currBestIndividual.code)),
-                c=['black'], marker='s')
+    # Iscrtavanje centara
+    plt.scatter(x=currBestIndividual.code[:, 0],
+                y=currBestIndividual.code[:, 1],
+                c=['black'], marker='x')
     
-    #postavljanje naslova za svaku celiju
+    # Postavljanje naslova za svaku celiju
     plt.title(label="iteration: {}     inertia: {}   {}  {}".format(k, int(currBestIndividual.fitness_),
                 distance, category), fontsize=10)
 
 
+def  rouletteSelection(population):
+    calcFitness = [population[i].fitness_ for i  in range(len(population))]
+    fitnessSum = sum(calcFitness)
+    probabilities = [population[i].fitness_ / fitnessSum  for i in range(len(population))]        
+    cumSumProb = np.cumsum(probabilities)
+    
+    indexes = list(zip(range(len(population)), cumSumProb))
+    k = 0
+
+    prob = random.random()
+    for j in range(len(population)):
+        if indexes[j][1] > prob or indexes[j][1] == prob :
+            break
+    
+    k = indexes[j][0]
+    return k
+
+
+def tournamentSelection(population, TOURNAMENT_SIZE):
+    bestFitness = float('inf')
+    k = -1
+
+    for _ in range(TOURNAMENT_SIZE):
+        index = random.randrange(len(population))
+        if population[index].fitness_ < bestFitness:
+            bestFitness = population[index].fitness_
+            k = index
+    
+    return k
 
 class Individual:
     def __init__(self, num_clasters, points, mutation_rate, distance):
@@ -65,21 +86,17 @@ class Individual:
          return self.fitness_ < other.fitness_
          
     def fitness(self):
-        sse_distances = 0.0
+        distances = 0.0
         for i in range(len(self.labels)):
-            # print(tacke[i], self.code[self.labels[i]], euclidean_distances(self.code[self.labels[i]],tacke[i]))
             if self.distance == "ss_dist":
-                sse_distances += ss_dist(self.code[self.labels[i]],self.points[i])
+                distances += ss_dist(self.code[self.labels[i]],self.points[i])
             else:
-                sse_distances += manhattan_distances(self.code[self.labels[i]],self.points[i])
-        # sse_distances = sum([ euclidean_distances(self.code[self.labels[i]],self.points[i]) for i in range(len(self.labels))])
-        self.fitness_ = sse_distances
-        return sse_distances
+                distances += manhattan_distances(self.code[self.labels[i]],self.points[i])
+        self.fitness_ = distances
 
     def initialize(self):
-        self.code = random.sample(list(self.points), k = self.num_clasters)
+        self.code = np.array(random.sample(list(self.points), k = self.num_clasters))
         self.precomputeDistances()
-        self.fitness()
            
     def precomputeDistances(self):
         labels = []
@@ -99,73 +116,47 @@ class Individual:
         self.labels = labels
         
 
-        # Ovde proveravam ako je klaster przan ...
+        # Ovde proveravam ako je klaster prazan ...
         empty_index  = exitsts_empty_cluster(clusters)
-        # if empty_index != -1:
-            # print("Empty index", empty_index, "Cluster: ", clusters_2[empty_index])
         while empty_index !=-1:
-            # print("\n\n------PRAZAN KLASTER--------:  ", empty_index)            
-            # Uzmi random tacku i prebaci je iz njenog klastera u prazan klaster
             r_index = random.randrange(len(self.points))
-            clusters[empty_index] = [r_index]
-            # print("Prev_index points: ", r_index)
-            # Azuriraj labelu
-            prev_cluster = labels[r_index]
-            labels[r_index] = empty_index
+            clusters[empty_index].append(r_index)
 
             # Izbaci ovu tacku iz prethodnog klastera
+            prev_cluster = self.labels[r_index]
             clusters[prev_cluster].remove(r_index)
 
-            # Ponovo azuriraj centroide - msm da nema potrebe ovde preracunavati dok svaki klaster nema bar 1 tacku
-            # compute_centroids(code=self.code, clusters=clusters_2, num_clasters=self.num_clasters, points=self.points)
-
+            # Azuriraj labelu
+            self.labels[r_index] = empty_index
+            
             # Ponovo proveri ima li praznih klastera
             empty_index = exitsts_empty_cluster(clusters)
         
         # Preracunavanje  centroida
         compute_centroids(code=self.code, clusters=clusters, num_clasters=self.num_clasters, points=self.points)
+       
         #Azuriraj fitnes
         self.fitness()
         
-def selection(population, category='roulette', TOURNAMENT_SIZE=2):
+def selection(population, category, TOURNAMENT_SIZE):
     if category == 'roulette':
-        lengthOfPopulation = len(population)
-        calcFitness = [population[i].fitness() for i  in range(lengthOfPopulation)]
-        probabilities = [population[i].fitness() / sum(calcFitness)  for i in range(lengthOfPopulation)]        
-    
-        indexes = list(zip(range(lengthOfPopulation), np.cumsum(probabilities)))
-        k = 0
-    
-        prob = random.random()
-        for j in range(0, lengthOfPopulation):
-            if indexes[j][1] > prob or indexes[j][1] == prob :
-                break
-        
-        k = indexes[j][0]
-        
-    elif category == 'tournament':
-        bestFitness = float('inf')
-        k = -1
-    
-        for _ in range(TOURNAMENT_SIZE):
-            index = random.randrange(len(population))
-            if population[index].fitness() < bestFitness:
-                bestFitness = population[index].fitness()
-                k = index
+        k = rouletteSelection(population)
     else:
-        raise ValueError('Category must be tournament or roulette')
+        k = tournamentSelection(population, TOURNAMENT_SIZE)
     
     return k
 
 def crossover(parent1, parent2, child1, child2):
-    chromosomeLength = len(parent1.code)
-    i = random.randrange(chromosomeLength)
-    
+    i = random.randrange(len(parent1.code))    
     child1.code[:i], child2.code[:i] = parent1.code[:i], parent2.code[:i]
     child1.code[i:], child2.code[i:] = parent2.code[i:], parent1.code[i:]
 
 
 def mutation(individual, mutation_rate):
+    r = random.random()  
+    if r > mutation_rate:
+        return
+    
     individualLength = len(individual)
     gene = len(individual[0])
     
@@ -173,11 +164,6 @@ def mutation(individual, mutation_rate):
     if (random.random() < 0.5):
         sign = 1
         
-    r = random.random()  
-        
-    if r > mutation_rate:
-        return
-
     randomCentroid = random.randrange(individualLength)
     delta = random.uniform(0, 1)
     for j in range(gene):
@@ -191,7 +177,6 @@ def mutation(individual, mutation_rate):
 
 def genethic_algorithm(num_clasters, points, mutation_rate, pop_size,
                        category, tournament_size, distance,  max_iter, elitism_size):
-    #Create an inital population 
     population = [Individual(num_clasters,points, mutation_rate,distance) for _ in range(pop_size)]
     newPopulation = [Individual(num_clasters,points, mutation_rate,distance) for _ in range(pop_size)]
 
@@ -211,9 +196,9 @@ def genethic_algorithm(num_clasters, points, mutation_rate, pop_size,
             #prelazak u narednu celiju 
             plt_ind += 1
             
-        #Elitism
+        # Elitizam
         newPopulation[:elitism_size] = population[:elitism_size]
-            
+        
         for i in range(elitism_size, pop_size, 2):
             k1 = selection(population, category, tournament_size)
             k2 = selection(population, category, tournament_size)
@@ -223,20 +208,20 @@ def genethic_algorithm(num_clasters, points, mutation_rate, pop_size,
             mutation(newPopulation[i].code, mutation_rate)
             mutation(newPopulation[i+1].code, mutation_rate)
             
+            # Azuriraju se centroide    
             newPopulation[i].precomputeDistances()
             newPopulation[i+1].precomputeDistances()
         
         population = newPopulation
         
         
-    population.sort()
-    
+    bestIndividual = min(population)
     #Iscrtavanje finalnog rezultata
     fig.add_subplot(int(n/2+1), 2, plt_ind)
-    plot_best_individual(population[0], max_iter - 1, category, distance)    
+    plot_best_individual(bestIndividual, max_iter - 1, category, distance)    
     plt.tight_layout()
     plt.show()
         
-    return population[0]
+    return bestIndividual
 
 # *****************************************************************************************************************

@@ -1,17 +1,21 @@
 import ga
 class GACluster:
+    
     def __init__(self, n_clusters=8, max_iter = 500, population_size = 100, category='roulette',
                  tournament_size=2, distance = 'ss_dist', mutation_rate = 0.05, elitism_size = 1):
         self.n_clusters_ = n_clusters
         self.max_iter_ = max_iter
         self.population_size_ = population_size
+        
+        if category not in ['roulette', 'tournament']:
+            raise ValueError('Category must be roulette or tournament')
         self.category_ = category
-        self.tournament_size = tournament_size
-
+        
         if distance not in ['ss_dist', 'manhattan']:
             raise  ValueError('Disttance must be ss_dist or manhattan')
         self.distance_ = distance
         
+        self.tournament_size = tournament_size        
         self.mutation_rate_ = mutation_rate
         self.elitism_size_ = elitism_size
         self.cluster_centers_ = []
