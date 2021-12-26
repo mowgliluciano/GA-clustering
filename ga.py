@@ -2,7 +2,7 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 
-
+# Kvadrat norme  vektora (X - Y) 
 def ss_dist(X, Y):
     return np.sum(np.subtract(X,Y)**2)
 
@@ -12,8 +12,8 @@ def manhattan_distances(X, Y):
 # Funkcija koja vraca indeks praznog klastera
 def exitsts_empty_cluster(clusters):
     try:
-        index_of_empt = clusters.index([])
-        return index_of_empt        
+        index_of_empty = clusters.index([])
+        return index_of_empty        
     except ValueError:
         return -1
         
@@ -25,11 +25,10 @@ def compute_centroids(code, clusters, num_clasters, points):
     
 # Funkcija koja iscrtava klasterovanje najbolje jedinke      
 def plot_best_individual(currBestIndividual, k, category, distance):
-    colors = np.array(['red', 'blue', 'gold',  'green', 'plum', 'orange', 'magenta'])
     #Iscrtavanje tacaka
     plt.scatter(x=currBestIndividual.points[ : , 0],
                 y=currBestIndividual.points[ : , 1],
-                c=colors[currBestIndividual.labels])
+                c=currBestIndividual.labels)
     
     # Iscrtavanje centara
     plt.scatter(x=currBestIndividual.code[:, 0],
@@ -37,7 +36,7 @@ def plot_best_individual(currBestIndividual, k, category, distance):
                 c=['black'], marker='x')
     
     # Postavljanje naslova za svaku celiju
-    plt.title(label="iteration: {}     inertia: {}   {}  {}".format(k, int(currBestIndividual.fitness_),
+    plt.title(label="iteration: {}     inertia: {}   {}  {}".format(k, round(currBestIndividual.fitness_),
                 distance, category), fontsize=10)
 
 
@@ -56,20 +55,32 @@ def  rouletteSelection(population):
             break
     
     k = indexes[j][0]
-    return k
+    return population[k]
 
 
 def tournamentSelection(population, TOURNAMENT_SIZE):
-    bestFitness = float('inf')
-    k = -1
+    chosen = random.sample(population, TOURNAMENT_SIZE)
+    winner = min(chosen)    
+    return winner
 
-    for _ in range(TOURNAMENT_SIZE):
-        index = random.randrange(len(population))
-        if population[index].fitness_ < bestFitness:
-            bestFitness = population[index].fitness_
-            k = index
+# Funkcija koja obradjuje prazne klastere 
+def  fixEmptyClusters(clusters, labels):
+    empty_index  = exitsts_empty_cluster(clusters)
+    while empty_index !=-1:
+        # Uzmi random tacku
+        r_index = random.randrange(len(labels))
+        clusters[empty_index].append(r_index)
+
+        # Izbaci ovu tacku iz prethodnog klastera
+        prev_cluster = labels[r_index]
+        clusters[prev_cluster].remove(r_index)
+
+        # Azuriraj labelu
+        labels[r_index] = empty_index
+        
+        # Ponovo proveri ima li praznih klastera
+        empty_index = exitsts_empty_cluster(clusters)
     
-    return k
 
 class Individual:
     def __init__(self, num_clasters, points, mutation_rate, distance):
@@ -115,36 +126,22 @@ class Individual:
 
         self.labels = labels
         
-
-        # Ovde proveravam ako je klaster prazan ...
-        empty_index  = exitsts_empty_cluster(clusters)
-        while empty_index !=-1:
-            r_index = random.randrange(len(self.points))
-            clusters[empty_index].append(r_index)
-
-            # Izbaci ovu tacku iz prethodnog klastera
-            prev_cluster = self.labels[r_index]
-            clusters[prev_cluster].remove(r_index)
-
-            # Azuriraj labelu
-            self.labels[r_index] = empty_index
-            
-            # Ponovo proveri ima li praznih klastera
-            empty_index = exitsts_empty_cluster(clusters)
+        # Obrada praznih klastera 
+        fixEmptyClusters(clusters, self.labels)
         
         # Preracunavanje  centroida
         compute_centroids(code=self.code, clusters=clusters, num_clasters=self.num_clasters, points=self.points)
        
-        #Azuriraj fitnes
+        # Azuriranje fitnesa
         self.fitness()
         
 def selection(population, category, TOURNAMENT_SIZE):
     if category == 'roulette':
-        k = rouletteSelection(population)
+        chosen = rouletteSelection(population)
     else:
-        k = tournamentSelection(population, TOURNAMENT_SIZE)
+        chosen = tournamentSelection(population, TOURNAMENT_SIZE)
     
-    return k
+    return chosen
 
 def crossover(parent1, parent2, child1, child2):
     i = random.randrange(len(parent1.code))    
@@ -193,17 +190,17 @@ def genethic_algorithm(num_clasters, points, mutation_rate, pop_size,
         if k % 10 == 0:
             fig.add_subplot(int(n/2+1), 2, plt_ind)
             plot_best_individual(population[0], k, category, distance)
-            #prelazak u narednu celiju 
+            # Prelazak u narednu celiju 
             plt_ind += 1
             
         # Elitizam
         newPopulation[:elitism_size] = population[:elitism_size]
         
         for i in range(elitism_size, pop_size, 2):
-            k1 = selection(population, category, tournament_size)
-            k2 = selection(population, category, tournament_size)
+            parrent1 = selection(population, category, tournament_size)
+            parrent2 = selection(population, category, tournament_size)
             
-            crossover(population[k1], population[k2], newPopulation[i], newPopulation[i + 1])
+            crossover(parrent1, parrent2, newPopulation[i], newPopulation[i + 1])
 
             mutation(newPopulation[i].code, mutation_rate)
             mutation(newPopulation[i+1].code, mutation_rate)
@@ -216,12 +213,11 @@ def genethic_algorithm(num_clasters, points, mutation_rate, pop_size,
         
         
     bestIndividual = min(population)
-    #Iscrtavanje finalnog rezultata
+    # Iscrtavanje finalnog rezultata
     fig.add_subplot(int(n/2+1), 2, plt_ind)
     plot_best_individual(bestIndividual, max_iter - 1, category, distance)    
     plt.tight_layout()
     plt.show()
-        
     return bestIndividual
-
+        
 # *****************************************************************************************************************
